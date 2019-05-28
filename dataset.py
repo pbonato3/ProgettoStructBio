@@ -382,14 +382,12 @@ class ProteinDataset:
         print pd_data
         return pd.DataFrame(data = pd_data, columns = self.features_names + ["Lip_Flag"])
 
+    def training_set_in(self, path ="./training.txt"):
+        return pd.read_csv(path)
 
     def training_set_out(self, X, y, path ="./training.txt"):
     	self.as_dataframe(X,y).to_csv(path)
+        return 
 
-	def training_set_in(self, path ="./training.txt"):
-	    df = pd.read_csv(path)
-	    X_tr = df[features_names]
-	    y_tr = df["Lip_Flag"]
-	    return X_tr,y_tr
 
 

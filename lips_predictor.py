@@ -42,15 +42,28 @@ solvent_accessibility = {
 #################  MAIN PROGRAM   #####################
 #######################################################
 
-from Dataset import ProteinDataset
+from dataset import ProteinDataset
 
-dataset = ProteinDataset()
-dataset.parse()
+prot_dataset = ProteinDataset()
+prot_dataset.parse()
 #dataset.download_all_pdb()
 #dataset.download_all_ring_files()
 
 
-prot_list = dataset.get_prot_list()
+prot_list = prot_dataset.get_prot_list()
+
+
+df = prot_dataset.training_set_in("rand_all_w4d4.5.txt")
+
+
+import matplotlib.pyplot as plt
+
+for feature in prot_dataset.features_names:
+    df.boxplot(column=feature, by="Lip_Flag")
+    plt.show()
+
+df.plot.scatter(x="Intra_CC/n_res", y="Inter_CC/n_res", c="Lip_Flag", colormap='viridis')
+plt.show()
 
 #long_prot =["1cee","1dev","1dow","1fqj","1g3j","1hrt","1i7w","1j2j","1jsu","1l8c","1p4q","1q68","1rf8","1sc5","1sqq","1tba","1th1","1xtg","1zoq","2a6q","2auh","2c1t","2o8a"]
 #short_prot = []
@@ -62,11 +75,8 @@ prot_list = dataset.get_prot_list()
 #prot_list_tr = short_prot[0:6] + long_prot[0:6]
 
 
-residues, X_tr, y_tr= dataset.generate_random_examples(prot_list, 4, 4.5, 10)
+#residues, X_tr, y_tr= prot_dataset.generate_random_examples(prot_list, 4, 4.5, 10)
 
-print X_tr
-
-dataset.training_set_out(X_tr, y_tr)
 
 
 
