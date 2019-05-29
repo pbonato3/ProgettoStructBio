@@ -11,7 +11,7 @@ import requests
 import json
 import time
 import zipfile
-from Bio.PDB import PDBList
+from Bio.PDB import PDBList, DSSP
 from Bio.PDB.PDBParser import PDBParser
 
 
@@ -64,6 +64,32 @@ factor_V = {
 
 
 #######################################################
+#################  DSSP FUNCTIONS #####################
+#######################################################
+
+def get_asa(residues):
+    pdb_id = residues[0].get_full_id()[0]
+    chain_id = residues[0].get_full_id()[2]
+    structure = PDBParser(QUIET=True).get_structure(pdb_id, "./pdb_files/pdb{}.ent".format(pdb_id))
+    dssp = DSSP(structure[0], "./pdb_files/pdb{}.ent".format(pdb_id), dssp="bin/xssp-master/mkdssp")
+    dssp = dict(dssp)  # Convert to dict to access residues
+
+    tot_residues = len(residues)
+    ss_content = {}
+    surface = 0
+    for residue in residues:
+        if dssp.get((chain_id, residue.id)):
+            tot_residues += 1
+            dssp_index, aa, ss, asa, phi, psi, NH_O_1_relidx, NH_O_1_energy, O_NH_1_relidx, O_NH_1_energy, NH_O_2_relidx, NH_O_2_energy, O_NH_2_relidx, O_NH_2_energy = dssp.get((chain_id, residue.id))
+            surface += asa
+            ss_content.setdefault(ss, 0)
+            ss_content[ss] += 1
+    #for ss in ss_content:
+        #print "{} {} {} {:.2f}".format(chain.id, ss, ss_content[ss], float(ss_content[ss]) / tot_residues)
+    #print "{} ASA {:.2f} {:.2f}\n".format(chain.id, surface, float(surface) / tot_residues)
+    return float(surface) / tot_residues
+
+#######################################################
 #################  RING FUNCTIONS #####################
 #######################################################
 
@@ -99,7 +125,7 @@ def chain_from_ring_id(res_id):
     return res_id.split(":")[0]
 
 # Generate contact network for 
-def generate_contact_network(prot_id, dir_path = "./ring_files", contact_threshold = 4):
+def generate_contact_network(prot_id, dir_path = "./ring_files", contact_threshold = 8):
     contacts = {}
     # with open(out_contact_file) as f:
     with open("{}/{}_edges.txt".format(dir_path, prot_id) ) as f:
@@ -113,12 +139,15 @@ def generate_contact_network(prot_id, dir_path = "./ring_files", contact_thresho
 
             distance = float(distance)
             if distance <= contact_threshold:
-                # print line
+                ls_distance = "short"
+                if distance > contact_threshold/2:
+                    ls_distance = "long"
+
                 edge_type, edge_loc = edge.split(":")
                 contacts.setdefault(node_1, [])
                 contacts.setdefault(node_2, [])
-                contacts[node_1].append((node_2, edge_loc, (atom_2, atom_1), edge_type))
-                contacts[node_2].append((node_1, edge_loc, (atom_1, atom_2), edge_type))
+                contacts[node_1].append((node_2, edge_loc, (atom_2, atom_1), edge_type, ls_distance))
+                contacts[node_2].append((node_1, edge_loc, (atom_1, atom_2), edge_type, ls_distance))
 
     return (contacts)
 
@@ -128,7 +157,7 @@ def generate_contact_network(prot_id, dir_path = "./ring_files", contact_thresho
 #################  OTHER FUNCTIONS ####################
 #######################################################
 
-def extract_features(residues, central_index, win_length, contacts_network, contact_threshold):
+def extract_features(residues, central_index, win_length, contacts_network):
     X = []
     win_start = central_index - win_length
     if(win_start < 0):
@@ -138,28 +167,30 @@ def extract_features(residues, central_index, win_length, contacts_network, cont
         win_end = len(residues) - 1
 
     n_of_res = 0
-    dist = compute_distance(residues[win_start],residues[win_end])
 
     # set to float to avoid approx
     inter_cc = 0.0
     intra_cc = 0.0
-
-    chain_length = len(residues)
-    chain_dist = compute_distance(residues[0], residues[-1]) 
-    chain_angle = compute_angle(residues[0], residues[chain_length/2], residues[-1])
-
+    long_cc  = 0.0
+    short_cc = 0.0
     f_I   = 0.0
     f_II  = 0.0
     f_III = 0.0
     f_IV  = 0.0
     f_V   = 0.0
 
+    dist = compute_distance(residues[win_start],residues[win_end])
+    angle = compute_angle(residues[win_start],residues[win_start + (win_end-win_start)/2], residues[win_end])
 
     for index in range(win_start, win_end):
         curr_residue = residues[index]
         ring_id = residue_to_ring_id(curr_residue)
         if ring_id in contacts_network: 
             for contact in contacts_network[ring_id]:
+                if contact[4] == "long":
+                    long_cc += 1
+                if contact[4] == "short":
+                    short_cc += 1    
                 if chain_from_ring_id(contact[0]) == curr_residue.get_full_id()[2]:
                     intra_cc += 1
                 else:
@@ -174,16 +205,15 @@ def extract_features(residues, central_index, win_length, contacts_network, cont
     X.append(inter_cc/(intra_cc+1))
     X.append(intra_cc/n_of_res)
     X.append(inter_cc/n_of_res)
+    X.append(long_cc/ n_of_res)
+    X.append(short_cc/n_of_res)
     X.append(f_I  /n_of_res)
     X.append(f_II /n_of_res)
     X.append(f_III/n_of_res)
     X.append(f_IV /n_of_res)
     X.append(f_V  /n_of_res)
     X.append(dist/n_of_res)
-    X.append(compute_angle(residues[win_start],residues[win_start + (win_end-win_start)/2], residues[win_end]))
-    X.append(float(chain_length))
-    X.append(chain_dist)
-    X.append(chain_angle)
+    X.append(angle)
 
     return X
 
@@ -243,17 +273,19 @@ class ProteinDataset:
     ds = {}
     features_names = [
     	"Inter/Intra_CC", 
-    	"Intra_CC/n_res",
-    	"Inter_CC/n_res", 
-    	"f_I/n_of_res",
-    	"f_II/n_of_res",
-    	"f_III/n_of_res",
-    	"f_IV/n_of_res",
-    	"f_V/n_of_res", 
-    	"Dist/n_res", 
+    	"Intra_CC",
+    	"Inter_CC",
+        "Long_CC",
+        "Short_CC",
+    	"f_I",
+    	"f_II",
+    	"f_III",
+    	"f_IV",
+    	"f_V", 
+    	"Dist", 
     	"Angle", 
-    	"Chain_Length", 
-    	"Chain_Dist", 
+    	"Seq_Len", 
+    	"Chain_Dist/Seq_Len", 
     	"Chain_Angle"
     	]
 
@@ -287,16 +319,20 @@ class ProteinDataset:
     def get_prot_list(self):
         return self.ds.keys()
 
-    def download_all_pdb(self, dir_path = "./pdb_files"):
+    def download_pdb(self, ids, dir_path = "./pdb_files"):
         pdbl = PDBList()
-        for prot_id in self.ds.get_prot_list():
+        for prot_id in ids:
             pdbl.retrieve_pdb_file(prot_id, pdir=dir_path, file_format='pdb')
 
-    def download_all_ring_files(self, ring_folder="./ring_files"):
-        for pdb_id in self.get_prot_list():
-            print ("Calculating contacts for protein: {}".format(pdb_id))
-            if not "{}_edges.txt".format(pdb_id) in listdir(ring_folder):
+    def download_ring(self, ids, ring_folder="./ring_files"):
+        for pdb_id in ids:
+            if "{}_edges.txt".format(pdb_id) not in listdir(ring_folder):
+                print "Downloading ring file for: {}".format(pdb_id)
                 download_ring_file(pdb_id, ring_folder)
+            else:
+                print "Ring file for: {} exists".format(pdb_id)
+
+
 
     def generate_test(self, pdb_id, win_length, contact_threshold):
         eval_res = []
@@ -310,11 +346,22 @@ class ProteinDataset:
                 for residue in chain:
                     if residue.id[0] == ' ':
                         chain_res.append(residue)
-                
+
+                # chain features
+                seq_length = len(chain_res)
+                chain_dist = compute_distance(chain_res[0], chain_res[-1]) 
+                chain_angle = compute_angle(chain_res[0], chain_res[seq_length/2], chain_res[-1])
+                #chain_asa = get_asa(chain_res)
+
                 for res in chain_res:
                     central_index = chain_res.index(res)
-                    X.append(extract_features(chain_res, central_index, win_length, contacts, contact_threshold))
-    
+                    f = extract_features(chain_res, central_index, win_length, contacts)
+                    f.append(seq_length)
+                    f.append(chain_dist/seq_length)
+                    f.append(chain_angle)
+                    #f.append(chain_asa)
+                    X.append(f)
+
                     if self.check_res(res):
                         y.append(1)
                     else:
@@ -342,10 +389,20 @@ class ProteinDataset:
                             chain_res.append(residue)
     
                     selected_res = self.select_random_residues(chain_res, ex_per_chain)
-                
+                    # chain features
+                    seq_length = len(chain_res)
+                    chain_dist = compute_distance(chain_res[0], chain_res[-1]) 
+                    chain_angle = compute_angle(chain_res[0], chain_res[seq_length/2], chain_res[-1])
+                    #chain_asa = get_asa(chain_res)
+
                     for res in selected_res:
                         central_index = chain_res.index(res)
-                        X.append(extract_features(chain_res, central_index, win_length, contacts, contact_threshold))
+                        f = extract_features(chain_res, central_index, win_length, contacts)
+                        f.append(seq_length)
+                        f.append(chain_dist/seq_length)
+                        f.append(chain_angle)
+                        #f.append(chain_asa)
+                        X.append(f)
     
                         if self.check_res(res):
                             y.append(1)
@@ -379,7 +436,6 @@ class ProteinDataset:
             for item in X[i]:
                 pd_data[i].append(item)
             pd_data[i].append(y[i])
-        print pd_data
         return pd.DataFrame(data = pd_data, columns = self.features_names + ["Lip_Flag"])
 
     def training_set_in(self, path ="./training.txt"):
@@ -390,4 +446,32 @@ class ProteinDataset:
         return 
 
 
+    def balance_neg_pos(residues, features, lip, prop = 50):
+        if prop < 50:
+            prop = 50
+        new_res = residues
+        new_fea = features
+        new_lip = lip
+        
+        tot = len(new_lip)
+        pos_count = new_lip.count(1)
+        neg_count = new_lip.count(0)
+        
+        while(float(neg_count)/float(tot) > prop or float(pos_count)/float(tot) > prop ):
+            if (neg_count > pos_count):
+                rand = random.randrange(len(new_lip))
+                if new_lip[rand] == 0:
+                    new_res.pop(rand)
+                    new_fea.pop(rand)
+                    new_lip.pop(rand)
+                    neg_count -= 1
+            else:
+                rand = random.randrange(len(new_lip))
+                if new_lip[rand] == 1:
+                    new_res.pop(rand)
+                    new_fea.pop(rand)
+                    new_lip.pop(rand)
+                    pos_count -= 1
+    
+        return(new_res, new_fea, new_lip)
 
