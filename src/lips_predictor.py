@@ -4,19 +4,21 @@ import matplotlib.pyplot as plt
 import argparse
 
 def show_plots(args):
-    df = prot_dataset.training_set_in(args.path)
+    path = args.path
+
+    df = prot_dataset.training_set_in(path)
     
     for feature in prot_dataset.features_names:
-        df.boxplot(column=feature, by="Lip_Flag")
+        df.boxplot(column=feature, by="y")
         plt.show()
     
-    df.plot.scatter(x="Intra_CC", y="Inter_CC", c="Lip_Flag", colormap='viridis')
+    df.plot.scatter(x="Intra_CC", y="Inter_CC", c="y", colormap='viridis')
     plt.show()
     
-    df.plot.scatter(x="Chain_Dist/Seq_Len", y="Chain_Angle", c="Lip_Flag", colormap='viridis')
+    df.plot.scatter(x="Chain_Dist/Seq_Len", y="Chain_Angle", c="y", colormap='viridis')
     plt.show()
 
-    df.plot.scatter(x="Dist", y="Angle", c="Lip_Flag", colormap='viridis')
+    df.plot.scatter(x="Dist", y="Angle", c="y", colormap='viridis')
     plt.show()
 
 def download_pdb_files(args):
@@ -39,26 +41,40 @@ def download_ring_files(args):
 
 
 def random_dataset(args):
-    if args.pdb_ids[0] == "all":
-        args.pdb_ids = prot_dataset.get_prot_list()
-    res, X, y = prot_dataset.generate_random_examples(args.pdb_ids,win_length= args.win_length,contact_threshold = args.contact_threshold, ex_per_chain=args.n_examples )
-    if args.balance:
+    path = args.path
+    win_length = args.win_length
+    pdb_ids = args.pdb_ids
+    contact_threshold = args.contact_threshold
+    n_examples = args.n_examples
+    balance = args.balance
+
+    if not path:
+        path = "../sets/rand_dataset_w{}c{}.txt".format(win_length, contact_threshold)
+    if pdb_ids[0] == "all":
+        pdb_ids = prot_dataset.get_prot_list()
+    res, X, y = prot_dataset.generate_random_examples(pdb_ids,win_length= win_length, contact_threshold = contact_threshold, ex_per_chain=n_examples )
+    if balance:
         res, X, y = prot_dataset.balance_neg_pos(res, X, y )
-    prot_dataset.training_set_out(X,y,args.path)
+    prot_dataset.training_set_out(X,y,path)
 
 def feature3D(args):
     import pymol
     from pymol import cmd, util
 
-    residues, features, lip_indexes = prot_dataset.generate_test(args.pdb_id, args.win_length, args.contact_threshold)
+    pdb_id = args.pdb_id
+    win_length = args.win_length
+    contact_threshold = args.contact_threshold
+    feature_name = args.feature_name
+
+    residues, features, lip_indexes = prot_dataset.generate_test(pdb_id, win_length, contact_threshold)
     df = prot_dataset.as_dataframe(features,lip_indexes)
-    feature = df[args.feature_name]
+    feature = df[feature_name]
 
     pymol.finish_launching()  # Open Pymol (not necessary from pyMOL 2.1)
-    cmd.fetch(args.pdb_id, args.pdb_id)  # Download the PDB
+    cmd.fetch(pdb_id, pdb_id)  # Download the PDB
 
-    cmd.hide("lines", args.pdb_id)  # Hide lines
-    cmd.show("cartoon", args.pdb_id)  # Show ribbon
+    cmd.hide("lines", pdb_id)  # Hide lines
+    cmd.show("cartoon", pdb_id)  # Show ribbon
 
     cmd.alter("(all)", "b=0.0")  # Set all B-factor to 0.0
 
@@ -86,7 +102,7 @@ subparsers = parser.add_subparsers(help='sub-command help')
 
 # create the parser for the "plots" command
 parser_plots = subparsers.add_parser('plots', help='Show boxplots and scatterplots about the features used in this program')
-parser_plots.add_argument('-p','--path', nargs='?', default ="./rand_all_w4d4.5.txt" ,help='Specify the training set to plot. Default is "./rand_all_w4d4.5.txt"')
+parser_plots.add_argument('-p','--path', nargs='?', default ="../sets/rand_all_w4d4.5.txt" ,help='Specify the training set to plot. Default is "./rand_all_w4d4.5.txt"')
 # set default function
 parser_plots.set_defaults(func=show_plots)
 
@@ -120,7 +136,7 @@ parser_rand_dataset.add_argument('-w','--win_length', type= int, nargs='?', defa
 parser_rand_dataset.add_argument('-c','--contact_threshold', type= float, nargs='?', default=6, help='Specify the contact threshold.')
 parser_rand_dataset.add_argument('-x','--n_examples', type= int, nargs='?', default=10, help='Number of examples selected for every chain.')
 parser_rand_dataset.add_argument('-b','--balance', default = False, action='store_true', help='Balance number of positive and negative examples.')
-parser_rand_dataset.add_argument('-p','--path', nargs='?', default ="./training.txt" ,help='Specify path for the output file. Default is "./training.txt"')
+parser_rand_dataset.add_argument('-p','--path', nargs='?' ,help='Specify path for the output file. Default is "../sets/training.txt"')
 
 # set default function
 parser_rand_dataset.set_defaults(func=random_dataset)

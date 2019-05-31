@@ -11,7 +11,7 @@ import requests
 import json
 import time
 import zipfile
-from Bio.PDB import PDBList, DSSP
+from Bio.PDB import PDBList, DSSP, NeighborSearch
 from Bio.PDB.PDBParser import PDBParser
 
 
@@ -125,7 +125,7 @@ def chain_from_ring_id(res_id):
     return res_id.split(":")[0]
 
 # Generate contact network for 
-def generate_contact_network(prot_id, dir_path = "./ring_files", contact_threshold = 8):
+def generate_contact_network(prot_id, dir_path = "../ring_files", contact_threshold = 8):
     contacts = {}
     # with open(out_contact_file) as f:
     with open("{}/{}_edges.txt".format(dir_path, prot_id) ) as f:
@@ -157,6 +157,20 @@ def generate_contact_network(prot_id, dir_path = "./ring_files", contact_thresho
 #################  OTHER FUNCTIONS ####################
 #######################################################
 
+def extract_chain_features(chain_res):
+    seq_length = len(chain_res)
+    chain_dist = compute_distance(chain_res[0], chain_res[-1]) 
+    chain_angle = compute_angle(chain_res[0], chain_res[seq_length/2], chain_res[-1])
+    #chain_asa = get_asa(chain_res)
+    return [
+        seq_length, 
+        chain_dist/seq_length, 
+        chain_angle, 
+        (chain_dist/seq_length)/chain_angle
+        ]
+
+
+
 def extract_features(residues, central_index, win_length, contacts_network):
     X = []
     win_start = central_index - win_length
@@ -184,8 +198,11 @@ def extract_features(residues, central_index, win_length, contacts_network):
 
     for index in range(win_start, win_end):
         curr_residue = residues[index]
+           
+
         ring_id = residue_to_ring_id(curr_residue)
         if ring_id in contacts_network: 
+
             for contact in contacts_network[ring_id]:
                 if contact[4] == "long":
                     long_cc += 1
@@ -214,8 +231,61 @@ def extract_features(residues, central_index, win_length, contacts_network):
     X.append(f_V  /n_of_res)
     X.append(dist/n_of_res)
     X.append(angle)
+    X.append(angle/(dist + 0.001))
 
     return X
+
+class ContactCounter:
+    contacts = {}
+
+    def __init__(self, structure, chain_id, threshold):
+        ns = NeighborSearch(list(structure.get_atoms()))
+
+        for chain in structure[0]:
+            if chain.id == chain_id:
+                for residue in chain:
+                    if residue.id[0] == ' ':
+                        inter = 0
+                        intra = 0
+                        lon = 0
+                        shor = 0
+    
+    
+                        center = get_center(residue)
+                        for a in ns.search(center, threshold):  # Iterate over contacts
+                            if a.get_full_id()[2] == residue.get_full_id()[2]:
+                                #if abs(int(a.get_full_id()[1]) - int(residue.get_full_id()[1])) > 3:
+                                intra += 1
+                            else:
+                                inter += 1
+                            if np.linalg.norm(a.get_coord()-center) < threshold/2:
+                                shor += 1
+                            else:
+                                lon += 1
+                        self.contacts[residue.get_full_id()] = (inter, intra, lon, shor)
+
+
+    def get_contacts(self, res):
+        return self.contacts[res.get_full_id()]
+
+    def get_inter(self, res):
+        return self.contacts[res.get_full_id()][0]
+
+    def get_intra(self, res):
+        return self.contacts[res.get_full_id()][1]
+
+    def get_long(self, res):
+        return self.contacts[res.get_full_id()][2]
+
+    def get_short(self, res):
+        return self.contacts[res.get_full_id()][3]
+
+def get_center(residue):
+        cm = []
+        for atom in residue:
+            cm.append(atom.get_coord())
+        cm = np.array(cm)
+        return np.sum(cm, axis=0) / len(residue)
 
 
 def compute_distance(res1, res2):
@@ -272,24 +342,26 @@ def compute_angle(res1, res2, res3):
 class ProteinDataset:
     ds = {}
     features_names = [
-    	"Inter/Intra_CC", 
-    	"Intra_CC",
-    	"Inter_CC",
-        "Long_CC",
-        "Short_CC",
+    	"IrIa_CC", 
+    	"Intra",
+    	"Inter",
+        "L_CC",
+        "S_CC",
     	"f_I",
     	"f_II",
     	"f_III",
     	"f_IV",
     	"f_V", 
     	"Dist", 
-    	"Angle", 
+    	"Ang", 
+        "Ang/Dist",
     	"Seq_Len", 
-    	"Chain_Dist/Seq_Len", 
-    	"Chain_Angle"
+    	"Ch_Dist/Seq_Len", 
+    	"Ch_Ang",
+        "ChD/SqL/An"
     	]
 
-    def parse(self, path = "lips_dataset.txt"):
+    def parse(self, path = "../sets/lips_dataset.txt"):
         dataset_file = open(path, 'r')
         lines = dataset_file.readlines()
 
@@ -319,12 +391,12 @@ class ProteinDataset:
     def get_prot_list(self):
         return self.ds.keys()
 
-    def download_pdb(self, ids, dir_path = "./pdb_files"):
+    def download_pdb(self, ids, dir_path = "../pdb_files"):
         pdbl = PDBList()
         for prot_id in ids:
             pdbl.retrieve_pdb_file(prot_id, pdir=dir_path, file_format='pdb')
 
-    def download_ring(self, ids, ring_folder="./ring_files"):
+    def download_ring(self, ids, ring_folder="../ring_files"):
         for pdb_id in ids:
             if "{}_edges.txt".format(pdb_id) not in listdir(ring_folder):
                 print "Downloading ring file for: {}".format(pdb_id)
@@ -332,14 +404,36 @@ class ProteinDataset:
             else:
                 print "Ring file for: {} exists".format(pdb_id)
 
+    def generate_blind_test(self, pdb_id, path, win_length, contact_threshold):
+        eval_res = []
+        X = []
+        y = []
+        contacts = generate_contact_network(pdb_id, contact_threshold = contact_threshold)
+        structure = PDBParser(QUIET=True).get_structure(pdb_id, "../pdb_files/pdb{}.ent".format(pdb_id))
 
+        for chain in structure[0]:
+            chain_res = []
+            for residue in chain:
+                if residue.id[0] == ' ':
+                    chain_res.append(residue)
+
+            cf = extract_chain_features(chain_res)
+
+            for res in chain_res:
+                central_index = chain_res.index(res)
+                f = extract_features(chain_res, central_index, win_length, contacts )
+                X.append(f+cf)
+
+        return (eval_res, X, y)
 
     def generate_test(self, pdb_id, win_length, contact_threshold):
         eval_res = []
         X = []
         y = []
+
         contacts = generate_contact_network(pdb_id, contact_threshold = contact_threshold)
-        structure = PDBParser(QUIET=True).get_structure(pdb_id, "./pdb_files/pdb{}.ent".format(pdb_id))
+        structure = PDBParser(QUIET=True).get_structure(pdb_id, "../pdb_files/pdb{}.ent".format(pdb_id))
+
         for chain in structure[0]:
             if chain.id in self.get_labelled_chains(pdb_id):
                 chain_res = []
@@ -347,20 +441,12 @@ class ProteinDataset:
                     if residue.id[0] == ' ':
                         chain_res.append(residue)
 
-                # chain features
-                seq_length = len(chain_res)
-                chain_dist = compute_distance(chain_res[0], chain_res[-1]) 
-                chain_angle = compute_angle(chain_res[0], chain_res[seq_length/2], chain_res[-1])
-                #chain_asa = get_asa(chain_res)
+                cf = extract_chain_features(chain_res)
 
                 for res in chain_res:
                     central_index = chain_res.index(res)
                     f = extract_features(chain_res, central_index, win_length, contacts)
-                    f.append(seq_length)
-                    f.append(chain_dist/seq_length)
-                    f.append(chain_angle)
-                    #f.append(chain_asa)
-                    X.append(f)
+                    X.append(f+cf)
 
                     if self.check_res(res):
                         y.append(1)
@@ -380,7 +466,7 @@ class ProteinDataset:
             sys.stdout.write("Generating random examples: {}%\r".format(done))
             sys.stdout.flush()
             contacts = generate_contact_network(pdb_id, contact_threshold = contact_threshold)
-            structure = PDBParser(QUIET=True).get_structure(pdb_id, "./pdb_files/pdb{}.ent".format(pdb_id))
+            structure = PDBParser(QUIET=True).get_structure(pdb_id, "../pdb_files/pdb{}.ent".format(pdb_id))
             for chain in structure[0]:
                 if chain.id in self.get_labelled_chains(pdb_id):
                     chain_res = []
@@ -390,19 +476,12 @@ class ProteinDataset:
     
                     selected_res = self.select_random_residues(chain_res, ex_per_chain)
                     # chain features
-                    seq_length = len(chain_res)
-                    chain_dist = compute_distance(chain_res[0], chain_res[-1]) 
-                    chain_angle = compute_angle(chain_res[0], chain_res[seq_length/2], chain_res[-1])
-                    #chain_asa = get_asa(chain_res)
+                    cf = extract_chain_features(chain_res)
 
                     for res in selected_res:
                         central_index = chain_res.index(res)
-                        f = extract_features(chain_res, central_index, win_length, contacts)
-                        f.append(seq_length)
-                        f.append(chain_dist/seq_length)
-                        f.append(chain_angle)
-                        #f.append(chain_asa)
-                        X.append(f)
+                        f = extract_features(chain_res, central_index, win_length, contacts )
+                        X.append(f+cf)
     
                         if self.check_res(res):
                             y.append(1)
@@ -411,6 +490,7 @@ class ProteinDataset:
                         eval_res.append(res)
             done_counter +=1
         sys.stdout.write("Generating random examples: 100%")
+        print
 
         return (eval_res, X, y)
 
@@ -436,12 +516,12 @@ class ProteinDataset:
             for item in X[i]:
                 pd_data[i].append(item)
             pd_data[i].append(y[i])
-        return pd.DataFrame(data = pd_data, columns = self.features_names + ["Lip_Flag"])
+        return pd.DataFrame(data = pd_data, columns = self.features_names + ["y"])
 
-    def training_set_in(self, path ="./training.txt"):
+    def training_set_in(self, path ="../sets/training.txt"):
         return pd.read_csv(path)
 
-    def training_set_out(self, X, y, path ="./training.txt"):
+    def training_set_out(self, X, y, path ="../sets/training.txt"):
     	self.as_dataframe(X,y).to_csv(path)
         return 
 

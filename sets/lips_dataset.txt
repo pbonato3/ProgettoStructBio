@@ -18,6 +18,8 @@ pdb	chain	start	end	type
 1jsu	A	neg	neg	long
 1jsu	B	neg	neg	long
 1jsu	C	25	93	long
+1kil	C	14	81	long
+1kil	D	150	203	long
 1l8c	A	neg	neg	long
 1l8c	B	100	149	long
 1p4q	A	9	52	long
@@ -41,6 +43,7 @@ pdb	chain	start	end	type
 1th1	C	1468	1529	long
 1xtg	A	neg	neg	long
 1xtg	B	149	204	long
+1ymh	E	818	860	long
 1zoq	A	neg	neg	long
 1zoq	C	2068	2107	long
 2a6q	B	11	63	long
