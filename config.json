@@ -1,0 +1,62 @@
+{
+	"short-window":4,
+	"large-window":60,
+	"contact-threshold":5,
+
+	"make-training-set" : false,
+	"examples-per-chain" : 100,
+	"balance" : false,
+	"training-set-path" : "../sets/training.txt",
+	"training-ids" : [
+		"2ivz",
+		"1dow",
+		"1hrt",
+		"1i7w",
+		"1j2j",
+		"1l8c",
+		"1rf8",
+		"1sqq",
+		"3b71",
+		"1a3b",
+		"1hv2",
+		"1ozs",
+		"1i8h",
+		"1axc",
+		"2gl7",
+		"1h2k",
+		"1ycq",
+		"1fv1",
+		"1kdx",
+		"1cqt"
+		],
+
+	"fit-model" : true,
+	"model-type": "decision-tree",
+	"trained-model-path" : "../trained-model.sav",	
+	"features": [
+		"IrIa_CC", 
+		"Intra",
+		"Inter",
+		"S_Dist", 
+		"S_Ang", 
+		"S_Ang/Dist",
+		"L_Dist/Seq_Len"
+		],
+
+	"predict" : true,
+	"predict-ids":[
+		"1jsu",
+		"1cee"
+	],
+	"probability-blur": true,
+	"result-file": "../results.txt",
+
+
+	"decision-tree": {
+		"max-depth":7
+	},
+
+	"multi-layer-perceptron": {
+		"hidden-layers":[4,2]
+	}
+}
