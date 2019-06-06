@@ -1,6 +1,6 @@
 {
 	"short-window":4,
-	"large-window":60,
+	"large-window":30,
 	"contact-threshold":5,
 
 	"make-training-set" : false,
@@ -31,16 +31,26 @@
 		],
 
 	"fit-model" : true,
-	"model-type": "decision-tree",
+	"model-type": "random-forest",
 	"trained-model-path" : "../trained-model.sav",	
 	"features": [
 		"IrIa_CC", 
 		"Intra",
 		"Inter",
+		"L_CC",
+		"S_CC",
+		"f_I",
+		"f_II",
+		"f_III",
+		"f_IV",
+		"f_V", 
 		"S_Dist", 
 		"S_Ang", 
 		"S_Ang/Dist",
-		"L_Dist/Seq_Len"
+		"L_Seq_Len", 
+		"L_Dist/Seq_Len", 
+		"L_Ang",
+		"L_Ang/Dist"
 		],
 
 	"predict" : true,
@@ -53,10 +63,25 @@
 
 
 	"decision-tree": {
-		"max-depth":7
+		"max-depth":7,
+		"random-state":1
 	},
 
+	"random-forest": {
+		"n-estimators":10,
+		"max-depth":null,
+		"random-state":1
+	},
+
+
 	"multi-layer-perceptron": {
-		"hidden-layers":[4,2]
+		"hidden-layers":[2,2,2,2,2,2],
+		"activation":"relu",
+		"solver":"adam",
+		"alpha":0.0001,
+		"learning-rate-init":0.001,
+		"max-iter":500,
+		"tol":1e-4,
+		"random-state":1
 	}
 }

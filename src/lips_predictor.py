@@ -76,13 +76,17 @@ def run_from_config(args):
 
         # load model from file
         predictor = models.model_in(params["trained-model-path"])
+        pdb_ids = params["predict-ids"]
+        # if specified in command, sobstiture
+        if args.pdb_ids:
+            pdb_ids = args.pdb_ids
         # check if pdb and ring file exists
-        prot_dataset.download_pdb(params["predict-ids"])
-        prot_dataset.download_ring(params["predict-ids"])
+        prot_dataset.download_pdb(pdb_ids)
+        prot_dataset.download_ring(pdb_ids)
 
         models.predict(
             clf = predictor, 
-            pdb_ids = params["predict-ids"], 
+            pdb_ids = pdb_ids, 
             features = params["features"],
             short_win = params["short-window"], 
             large_win = params["large-window"], 
@@ -288,6 +292,7 @@ parser_rand_dataset.set_defaults(func=random_dataset)
 # create the parser for the "rand_data" command
 parser_run= subparsers.add_parser('run', help='Run the program with parameters specified in configuration file.')
 parser_run.add_argument('-p','--path', type= str, nargs='?', default="../config.json", help='Path to configuration file')
+parser_run.add_argument('-i', '--pdb_ids', type= str, metavar='id', nargs='+' , help='Specify the ids to predict.')
 
 # set default function
 parser_run.set_defaults(func=run_from_config)
