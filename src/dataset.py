@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from os import listdir
+from os import getcwd
 import sys
 import copy
 import pandas as pd
@@ -14,6 +15,18 @@ import zipfile
 from Bio.PDB import PDBList, DSSP, NeighborSearch
 from Bio.PDB.PDBParser import PDBParser
 
+# find correct paths
+main_folder_path = './'
+src_folder_path = './src'
+
+if getcwd().endswith("/src"):
+    main_folder_path = '../'
+    src_folder_path = './'
+
+pdb_folder_path  = main_folder_path+'pdb_files/'
+ring_folder_path = main_folder_path+'ring_files/'
+sets_folder_path = main_folder_path+'sets/'
+test_folder_path = main_folder_path+'tests/'
 
 aa_3to1 = {
 	'CYS': 'C', 'ASP': 'D', 'SER': 'S', 'GLN': 'Q', 'LYS': 'K',
@@ -71,8 +84,8 @@ factor_V = {
 def get_asa(residues):
 	pdb_id = residues[0].get_full_id()[0]
 	chain_id = residues[0].get_full_id()[2]
-	structure = PDBParser(QUIET=True).get_structure(pdb_id, "./pdb_files/pdb{}.ent".format(pdb_id))
-	dssp = DSSP(structure[0], "./pdb_files/pdb{}.ent".format(pdb_id), dssp="bin/xssp-master/mkdssp")
+	structure = PDBParser(QUIET=True).get_structure(pdb_id, pdb_folder_path+"pdb{}.ent".format(pdb_id))
+	dssp = DSSP(structure[0], pdb_folder_path+"/pdb{}.ent".format(pdb_id), dssp=src_folder_path+"bin/xssp-master/mkdssp")
 	dssp = dict(dssp)  # Convert to dict to access residues
 
 	tot_residues = len(residues)
@@ -126,7 +139,7 @@ def chain_from_ring_id(res_id):
 	return res_id.split(":")[0]
 
 # Generate contact network from ring files
-def generate_contact_network(prot_id, dir_path = "../ring_files", contact_threshold = 8):
+def generate_contact_network(prot_id, dir_path = ring_folder_path, contact_threshold = 8):
 	# save contacts as a dictionary
 	contacts = {}
 	# with open(out_contact_file) as f:
@@ -401,7 +414,7 @@ class ProteinDataset:
 		]
 
 	# parse the lips_dataset from file
-	def parse(self, path = "../sets/lips_dataset.txt"):
+	def parse(self, path = sets_folder_path+"lips_dataset.txt"):
 		dataset_file = open(path, 'r')
 		lines = dataset_file.readlines()
 		# for every line in the file (except first one)
@@ -447,13 +460,13 @@ class ProteinDataset:
 		return self.ds.keys()
 
 	# download the given pdb files
-	def download_pdb(self, ids, dir_path = "../pdb_files"):
+	def download_pdb(self, ids, dir_path = pdb_folder_path):
 		pdbl = PDBList()
 		for prot_id in ids:
 			pdbl.retrieve_pdb_file(prot_id, pdir=dir_path, file_format='pdb')
 
 	# dowload ring files for the given ids, checks if already exists in ring folder
-	def download_ring(self, ids, ring_folder="../ring_files"):
+	def download_ring(self, ids, ring_folder= ring_folder_path):
 		for pdb_id in ids:
 			if "{}_edges.txt".format(pdb_id) not in listdir(ring_folder):
 				print "Downloading ring file for: {}".format(pdb_id)
@@ -470,7 +483,7 @@ class ProteinDataset:
 		# network of the contacts in the file
 		contacts = generate_contact_network(pdb_id, contact_threshold = contact_threshold)
 		# pdb structure
-		structure = PDBParser(QUIET=True).get_structure(pdb_id, "../pdb_files/pdb{}.ent".format(pdb_id))
+		structure = PDBParser(QUIET=True).get_structure(pdb_id, pdb_folder_path+"pdb{}.ent".format(pdb_id))
 
 		# for each chain in the structure
 		for chain in structure[0]:
@@ -507,7 +520,7 @@ class ProteinDataset:
 		# network of the contacts in the file
 		contacts = generate_contact_network(pdb_id, contact_threshold = contact_threshold)
 		# pdb structure
-		structure = PDBParser(QUIET=True).get_structure(pdb_id, "../pdb_files/pdb{}.ent".format(pdb_id))
+		structure = PDBParser(QUIET=True).get_structure(pdb_id, pdb_folder_path+"pdb{}.ent".format(pdb_id))
 
 		# for each chain in the structure
 		for chain in structure[0]:
@@ -563,7 +576,7 @@ class ProteinDataset:
 			# network of the contacts in the file
 			contacts = generate_contact_network(pdb_id, contact_threshold = contact_threshold)
 			# pdb structure
-			structure = PDBParser(QUIET=True).get_structure(pdb_id, "../pdb_files/pdb{}.ent".format(pdb_id))
+			structure = PDBParser(QUIET=True).get_structure(pdb_id, pdb_folder_path+"pdb{}.ent".format(pdb_id))
 
 			# for each chain in the structure
 			for chain in structure[0]:
@@ -634,11 +647,11 @@ class ProteinDataset:
 		return pd.DataFrame(data = pd_data, columns = self.features_names + ["y"])
 
 	# parse a pandas dataframe from file
-	def training_set_in(self, path ="../sets/training.txt"):
+	def training_set_in(self, path =sets_folder_path+"training.txt"):
 		return pd.read_csv(path)
 
 	# write dataset to file using pandas dataframe
-	def training_set_out(self, X, y, path ="../sets/training.txt"):
+	def training_set_out(self, X, y, path =sets_folder_path+"training.txt"):
 		self.as_dataframe(X,y).to_csv(path)
 		return 
 

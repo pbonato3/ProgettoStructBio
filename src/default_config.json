@@ -50,6 +50,7 @@
 		"1cee"
 	],
 	"probability-blur": true,
+	"probability-blur-len": 6,
 	"result-file": "../results.txt",
 
 

@@ -3,11 +3,26 @@ from dataset import ProteinDataset
 import models
 import argparse
 from os.path import isfile
+from os import getcwd
 import json
 import re
 
+# find correct paths
+main_folder_path = './'
+src_folder_path = './src'
+
+if getcwd().endswith("/src"):
+    main_folder_path = '../'
+    src_folder_path = './'
+
+pdb_folder_path  = main_folder_path+'pdb_files/'
+ring_folder_path = main_folder_path+'ring_files/'
+sets_folder_path = main_folder_path+'sets/'
+test_folder_path = main_folder_path+'tests/'
+
+
 # parse the configuration file
-def parse_config_file(path = "../config.json"):
+def parse_config_file(path = main_folder_path+"config.json"):
     # if config file exists
     if isfile(path):
         # initialize a collection
@@ -26,10 +41,8 @@ def parse_config_file(path = "../config.json"):
 
 # Run the program from configuration file
 def run_from_config(args):
-    import matplotlib.pyplot as plt
-
     # parse config file
-    params = parse_config_file(args.path)
+    params = parse_config_file(main_folder_path+args.path)
 
     #### training set ####
 
@@ -54,7 +67,7 @@ def run_from_config(args):
             # balance number of positive and negative examples
             res, X, y = prot_dataset.balance_neg_pos(res, X, y , params["positive-lb"])
         # output dataset
-        prot_dataset.training_set_out(X,y,params["training-set-path"])
+        prot_dataset.training_set_out(X,y,main_folder_path+params["training-set-path"])
 
 
     #### model fitting ####
@@ -63,7 +76,7 @@ def run_from_config(args):
 
     if params["fit-model"]:
         # parse training set
-        training_set = prot_dataset.training_set_in(params["training-set-path"])
+        training_set = prot_dataset.training_set_in(main_folder_path+params["training-set-path"])
 
         # initialize the standard classifier
         predictor = models.make_predictor(
@@ -73,7 +86,7 @@ def run_from_config(args):
             features = params["features"]
             )
 
-        models.model_out(predictor, params["trained-model-path"])
+        models.model_out(predictor, main_folder_path+params["trained-model-path"])
 
 
     #### prediction ####
@@ -82,7 +95,7 @@ def run_from_config(args):
     if params["predict"]:
 
         # load model from file
-        predictor = models.model_in(params["trained-model-path"])
+        predictor = models.model_in(main_folder_path+params["trained-model-path"])
         pdb_ids = params["predict-ids"]
         # if specified in command, sobstiture
         if args.pdb_ids:
@@ -109,8 +122,9 @@ def run_from_config(args):
             short_win = params["short-window"], 
             large_win = params["large-window"], 
             contact_threshold = params["contact-threshold"],
-            path = params["result-file"],
-            blur = params["probability-blur"]
+            path = main_folder_path+params["result-file"],
+            blur = params["probability-blur"],
+            blur_w = params["probability-blur-len"]
             )
 
     return
@@ -118,8 +132,9 @@ def run_from_config(args):
 
 # plots features of a given training set comparing lips and not lips
 def show_plots(args):
+    import matplotlib.pyplot as plt
     # geth path
-    path = args.path
+    path = main_folder_path+args.path
 
     # if given path doesn't exists print an error
     if not isfile(path):
@@ -175,7 +190,7 @@ def results3D(args):
     from pymol import cmd, util
 
     # get path adn pdb id
-    path = args.path
+    path = main_folder_path+args.path
     pdb_id = args.pdb_id
 
     # check if result file exists else print error
@@ -283,12 +298,6 @@ prot_dataset.parse()
 parser = argparse.ArgumentParser(prog='lips_predictor')
 subparsers = parser.add_subparsers(help='sub-command help')
 
-# create the parser for the "plots" command
-parser_plots = subparsers.add_parser('plots', help='Show boxplots and scatterplots about the features used in this program')
-parser_plots.add_argument('-p','--path', nargs='?', default ="../sets/plots.txt" ,help='Specify the training set to plot. Default is "../sets/plots.txt"')
-# set default function
-parser_plots.set_defaults(func=show_plots)
-
 # create the parser for the "downpdb" command
 parser_down_pdb = subparsers.add_parser('downpdb', help='Download pdb files.')
 parser_down_pdb.add_argument('-a','--all', default=False ,  action='store_true', help='Download pdb file for every entry in the dataset.')
@@ -303,8 +312,14 @@ parser_down_ring.add_argument('-i', type= str, metavar='id', nargs='+' , help='S
 # set default function
 parser_down_ring.set_defaults(func=download_ring_files)
 
+# create the parser for the "plots" command
+parser_plots = subparsers.add_parser('plots', help='Shows boxplots and scatterplots about the features used in this program, compraing LIPs and not LIPs examples.')
+parser_plots.add_argument('-p','--path', nargs='?', default = "sets/plots.txt" ,help='Specify the training set to plot. Default is "../sets/plots.txt"')
+# set default function
+parser_plots.set_defaults(func=show_plots)
+
 # create the parser for the "show3d" command
-parser_show3d= subparsers.add_parser('show3d', help='Show lip residues and a feature in pymol.')
+parser_show3d= subparsers.add_parser('show3d', help='Shows the pdb structure in pymol, coloring residues by values of a feature and representing LIP residues as spheres.')
 parser_show3d.add_argument('pdb_id', type= str, help='The pdb id that pymol has to fetch.')
 parser_show3d.add_argument('feature_name', choices= prot_dataset.features_names, help='Name of the feature to show.')
 parser_show3d.add_argument('-sw','--short_win', type= int, nargs='?', default=4, help='Length of short window to be used in feature extraction. Default is 4.')
@@ -314,16 +329,16 @@ parser_show3d.add_argument('-c','--contact_threshold', type= float, nargs='?', d
 parser_show3d.set_defaults(func=feature3D)
 
 # create the parser for the "results3d" command
-parser_results3d= subparsers.add_parser('results3d', help='Show lip residues and a feature in pymol.')
+parser_results3d= subparsers.add_parser('results3d', help='Shows the pdb structure in pymol, coloring residues with probability of being LIPs Blue (not LIP) to Red (is LIP).')
 parser_results3d.add_argument('pdb_id', type= str, help='Specify the id to show.')
-parser_results3d.add_argument('-p','--path', nargs='?', default = '../results.txt' ,help='Specify path of the results file that contains the predictions of the desired pdb id. Default is "../results.txt"')
+parser_results3d.add_argument('-p','--path', nargs='?', default = 'results.txt' ,help='Specify path of the results file that contains the predictions of the desired pdb id. Default is "../results.txt"')
 # set default function
 parser_results3d.set_defaults(func=results3D)
 
 
 # create the parser for the "rand_data" command
 parser_run= subparsers.add_parser('run', help='Run the program with parameters specified in configuration file.')
-parser_run.add_argument('-p','--path', type= str, nargs='?', default="../config.json", help='Path to configuration file. Default is "../config.json"')
+parser_run.add_argument('-p','--path', type= str, nargs='?', default="config.json", help='Path to configuration file. Default is "../config.json"')
 parser_run.add_argument('-i', '--pdb_ids', type= str, metavar='id', nargs='+' , help='Specify the ids to predict, overriding configuration file. If the first id is "all" every id in dataset is computed.')
 # set default function
 parser_run.set_defaults(func=run_from_config)
