@@ -6,6 +6,7 @@
 	"make-training-set" : false,
 	"examples-per-chain" : 100,
 	"balance" : false,
+	"positive-lb": 40,
 	"training-set-path" : "../sets/training.txt",
 	"training-ids" : [
 		"2ivz",

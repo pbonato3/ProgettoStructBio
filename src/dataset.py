@@ -340,7 +340,6 @@ def compute_distance(res1, res2):
 # compute angle between three residues
 def compute_angle(res1, res2, res3):
 	# initialize coordinates variables
-
 	a = 0
 	b = 0
 	c = 0
@@ -453,7 +452,7 @@ class ProteinDataset:
 		for prot_id in ids:
 			pdbl.retrieve_pdb_file(prot_id, pdir=dir_path, file_format='pdb')
 
-	# dowload ring files for the given ids, checks if already exists
+	# dowload ring files for the given ids, checks if already exists in ring folder
 	def download_ring(self, ids, ring_folder="../ring_files"):
 		for pdb_id in ids:
 			if "{}_edges.txt".format(pdb_id) not in listdir(ring_folder):
@@ -462,152 +461,199 @@ class ProteinDataset:
 			else:
 				print "Ring file for: {} exists".format(pdb_id)
 
+	# extracts features for a real test, without lips labels and considering all the chains in the model
 	def generate_blind_test(self, pdb_id, short_win, large_win, contact_threshold):
+		# residues evaluated
 		eval_res = []
+		# feautres associated with evaluated residues
 		X = []
+		# network of the contacts in the file
 		contacts = generate_contact_network(pdb_id, contact_threshold = contact_threshold)
+		# pdb structure
 		structure = PDBParser(QUIET=True).get_structure(pdb_id, "../pdb_files/pdb{}.ent".format(pdb_id))
 
+		# for each chain in the structure
 		for chain in structure[0]:
+			# initialize a list that will contains the residues of the chain
 			chain_res = []
+			# for each residue check if it is a good residue an if it is append it
 			for residue in chain:
 				if residue.id[0] == ' ':
 					chain_res.append(residue)
 
+			# for each of the residues in the chain
 			for res in chain_res:
+				# set it as the center of a window
 				central_index = chain_res.index(res)
+				# extract long and short range features 
 				sf = extract_short_range_features(chain_res, central_index, short_win, contacts )
 				lf = extract_long_range_features(chain_res, central_index, large_win)
+				# append residue's features to the list of computed features 
 				X.append(sf+lf)
+				# append the residue to the list of evaluated residues
 				eval_res.append(res)
 
+		# resturn evaluated residues, their features and a fake list of lip labels set to false
 		return (eval_res, X, np.zeros(len(X)))
 
+	# extracts features for a test used during model selection, with lips labels and considering only the labelled chains in the model
 	def generate_test(self, pdb_id, short_win, large_win, contact_threshold):
+		# residues evaluated
 		eval_res = []
+		# feautres associated with evaluated residues
 		X = []
+		# lips labels associated with evaluated residues
 		y = []
-
+		# network of the contacts in the file
 		contacts = generate_contact_network(pdb_id, contact_threshold = contact_threshold)
+		# pdb structure
 		structure = PDBParser(QUIET=True).get_structure(pdb_id, "../pdb_files/pdb{}.ent".format(pdb_id))
 
+		# for each chain in the structure
 		for chain in structure[0]:
+			# consider the chain only if it is labelled in the dataset
 			if chain.id in self.get_labelled_chains(pdb_id):
+			# initialize a list that will contains the residues of the chain
 				chain_res = []
+				# for each residue check if it is a good residue an if it is append it
 				for residue in chain:
 					if residue.id[0] == ' ':
 						chain_res.append(residue)
 
+				# for each of the residues in the chain
 				for res in chain_res:
+					# set it as the center of a window
 					central_index = chain_res.index(res)
+					# extract long and short range features 
 					sf = extract_short_range_features(chain_res, central_index, short_win, contacts )
 					lf = extract_long_range_features(chain_res, central_index, large_win)
+					# append residue's features to the list of computed features 
 					X.append(sf+lf)
-
+					# generate the lip labels list checking residues
 					if self.check_res(res):
 						y.append(1)
 					else:
 						y.append(0)
+					# append the residue to the list of evaluated residues
 					eval_res.append(res)
 
+		# resturn evaluated residues, their features and the list of lip labels
 		return (eval_res, X, y)
 
+
+	# extracts a given number of random examples from every given labelled chain 
 	def generate_random_examples(self, pdb_ids, short_win, large_win, contact_threshold, ex_per_chain):
+		# residues evaluated
 		eval_res = []
+		# feautres associated with evaluated residues
 		X = []
+		# lips labels associated with evaluated residues
 		y = []
+		# printing purpose only
 		done_counter = 0
+
+
+		# for each chain in the structure
 		for pdb_id in pdb_ids:
+			# printing purpose only
 			done = done_counter*100/len(pdb_ids)
 			sys.stdout.write("Generating random examples: {}%\r".format(done))
 			sys.stdout.flush()
+			
+			# network of the contacts in the file
 			contacts = generate_contact_network(pdb_id, contact_threshold = contact_threshold)
+			# pdb structure
 			structure = PDBParser(QUIET=True).get_structure(pdb_id, "../pdb_files/pdb{}.ent".format(pdb_id))
+
+			# for each chain in the structure
 			for chain in structure[0]:
+				# consider the chain only if it is labelled in the dataset 
 				if chain.id in self.get_labelled_chains(pdb_id):
+					# initialize a list that will contains the residues of the chain
 					chain_res = []
+					# for each residue check if it is a good residue an if it is append it
 					for residue in chain:
 						if residue.id[0] == ' ':
 							chain_res.append(residue)
-	
+					# select a certain number of random residues from the chain
 					selected_res = self.select_random_residues(chain_res, ex_per_chain)
 
+					# for each selectd residue
 					for res in selected_res:
+						# set it as the center of a window
 						central_index = chain_res.index(res)
+						# extract long and short range features 
 						sf = extract_short_range_features(chain_res, central_index, short_win, contacts )
 						lf = extract_long_range_features(chain_res, central_index, large_win)
+						# append residue's features to the list of computed features 
 						X.append(sf+lf)
-	
+						# generate the lip labels list checking residues
 						if self.check_res(res):
 							y.append(1)
 						else:
 							y.append(0)
 						eval_res.append(res)
+			# printing purpose only
 			done_counter +=1
+		# printing purpose only
 		sys.stdout.write("Generating random examples: 100%")
 		sys.stdout.flush()
 		print
 
+		# resturn evaluated residues, their features and the list of lip labels
 		return (eval_res, X, y)
 
 
-
+	# function used to select n residues from a list of residues
 	def select_random_residues(self, residues, n):
+		# if n is greater or equal to the number of given residues return all of them
 		if n >= len(residues):
-			n = len(residues)-1
+			return residues
+		# else init a list of selected residues
 		selected = []
-		i = 0
-		while i < n:
+		# while there's less than n residues selected
+		while len(selected) < n:
+			# select a random residue
 			rand = random.randrange(len(residues))
+			# if not in selected list yet, append it
 			if not residues[rand] in selected:
 				selected.append(residues[rand])
-				i += 1
+		# return selected residues
 		return selected
 
-
+	# transform features and lip labels into a pandas data frame
 	def as_dataframe(self, X, y):
 		pd_data = []
+		# append lip flag at the end of features list for every example
 		for i in range(0, len(X)):
 			pd_data.append([])
 			for item in X[i]:
 				pd_data[i].append(item)
 			pd_data[i].append(y[i])
+		# create and return dataset
 		return pd.DataFrame(data = pd_data, columns = self.features_names + ["y"])
 
+	# parse a pandas dataframe from file
 	def training_set_in(self, path ="../sets/training.txt"):
 		return pd.read_csv(path)
 
+	# write dataset to file using pandas dataframe
 	def training_set_out(self, X, y, path ="../sets/training.txt"):
 		self.as_dataframe(X,y).to_csv(path)
 		return 
 
+	# balance number of positive and negative examples in a dataset
+	# prop is lower bound percent of positive cases
+	def balance_neg_pos(self, new_res, new_fea, new_lip, prop = 50):
+		# check if percent is respencted
+		while(float(new_lip.count(1))/float(len(new_lip)) < prop ):
+			# if not pop a random negative example from every list
+			rand = random.randrange(len(new_lip))
+			if new_lip[rand] == 0:
+				new_res.pop(rand)
+				new_fea.pop(rand)
+				new_lip.pop(rand)
 
-	def balance_neg_pos(residues, features, lip, prop = 50):
-		if prop < 50:
-			prop = 50
-		new_res = residues
-		new_fea = features
-		new_lip = lip
-		
-		tot = len(new_lip)
-		pos_count = new_lip.count(1)
-		neg_count = new_lip.count(0)
-		
-		while(float(neg_count)/float(tot) > prop or float(pos_count)/float(tot) > prop ):
-			if (neg_count > pos_count):
-				rand = random.randrange(len(new_lip))
-				if new_lip[rand] == 0:
-					new_res.pop(rand)
-					new_fea.pop(rand)
-					new_lip.pop(rand)
-					neg_count -= 1
-			else:
-				rand = random.randrange(len(new_lip))
-				if new_lip[rand] == 1:
-					new_res.pop(rand)
-					new_fea.pop(rand)
-					new_lip.pop(rand)
-					pos_count -= 1
-	
+		# return new lists
 		return(new_res, new_fea, new_lip)
 

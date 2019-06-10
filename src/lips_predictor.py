@@ -1,26 +1,33 @@
 #!/usr/bin/env python
 from dataset import ProteinDataset
 import models
-import matplotlib.pyplot as plt
 import argparse
 from os.path import isfile
 import json
 import re
 
+# parse the configuration file
 def parse_config_file(path = "../config.json"):
+    # if config file exists
     if isfile(path):
+        # initialize a collection
         json_obj = {}
+        # load the collection using json
         with open(path, 'r') as file:
             json_obj = json.load(file)
             file.close()
+        # return the collection
         return json_obj
 
-    else:
-        print "can't find configuration file."
-        return 
+    # else print error
+    print "can't find configuration file."
+    return 
 
 
+# Run the program from configuration file
 def run_from_config(args):
+    import matplotlib.pyplot as plt
+
     # parse config file
     params = parse_config_file(args.path)
 
@@ -45,7 +52,7 @@ def run_from_config(args):
         # if balance flag is set to true
         if params["balance"]:
             # balance number of positive and negative examples
-            res, X, y = prot_dataset.balance_neg_pos(res, X, y )
+            res, X, y = prot_dataset.balance_neg_pos(res, X, y , params["positive-lb"])
         # output dataset
         prot_dataset.training_set_out(X,y,params["training-set-path"])
 
@@ -80,10 +87,21 @@ def run_from_config(args):
         # if specified in command, sobstiture
         if args.pdb_ids:
             pdb_ids = args.pdb_ids
+        # if the first element is 'all'
+        if pdb_ids[0] == "all":
+            # clear list
+            pdb_ids = []
+            # append every id that is not in the training set
+            for pdb in prot_dataset.get_prot_list() :
+                if pdb not in params["training-ids"]:
+                    pdb_ids.append(pdb)
+
+
         # check if pdb and ring file exists
         prot_dataset.download_pdb(pdb_ids)
         prot_dataset.download_ring(pdb_ids)
 
+        # run predict command with given parameters
         models.predict(
             clf = predictor, 
             pdb_ids = pdb_ids, 
@@ -98,138 +116,166 @@ def run_from_config(args):
     return
 
 
-
+# plots features of a given training set comparing lips and not lips
 def show_plots(args):
+    # geth path
     path = args.path
 
+    # if given path doesn't exists print an error
+    if not isfile(path):
+        print "No file found."
+        return 
+
+    # else parse the file as a dataframe
     df = prot_dataset.training_set_in(path)
-    
+    # for each feature extracted
     for feature in prot_dataset.features_names:
+        # show a boxplot of the feature values seprated by lip flag 
         df.boxplot(column=feature, by="y")
         plt.show()
-    
+    # show a scatterplot of inter vs intra chain contacts colored by lip flag
     df.plot.scatter(x="Intra", y="Inter", c="y", colormap='viridis')
     plt.show()
     
+    # show a scatterplot of large window mean length vs large window angle colored by lip flag
     df.plot.scatter(x="L_Dist/Seq_Len", y="L_Ang", c="y", colormap='viridis')
     plt.show()
 
+    # show a scatterplot of short window length vs short window angle colored by lip flag
     df.plot.scatter(x="S_Dist", y="S_Ang", c="y", colormap='viridis')
     plt.show()
+    return 
 
-
+# download pdb files by id
 def download_pdb_files(args):
+    # if all flag is set it will download all pdb in dataset
     if args.all:
         prot_dataset.download_pdb(prot_dataset.get_prot_list())
+    # else if ids are given it will download them
     elif args.i :
         prot_dataset.download_pdb(args.i)
-
     else:
         print "No id given."
 
+# download ring files by id
 def download_ring_files(args):
+    # if all flag is set it will download all pdb in dataset
     if args.all:
         prot_dataset.download_ring(prot_dataset.get_prot_list())
+    # else if ids are given it will download them
     elif args.i :
         prot_dataset.download_ring(args.i)
-
     else:
         print "No id given."
 
 
-def random_dataset(args):
-    path = args.path
-    win_length = args.win_length
-    pdb_ids = args.pdb_ids
-    contact_threshold = args.contact_threshold
-    n_examples = args.n_examples
-    balance = args.balance
-
-    if not path:
-        path = "../sets/rand_dataset_w{}c{}.txt".format(win_length, contact_threshold)
-    if pdb_ids[0] == "all":
-        pdb_ids = prot_dataset.get_prot_list()
-    res, X, y = prot_dataset.generate_random_examples(pdb_ids,short_win= win_length, large_win = 60, contact_threshold = contact_threshold, ex_per_chain=n_examples )
-    if balance:
-        res, X, y = prot_dataset.balance_neg_pos(res, X, y )
-    prot_dataset.training_set_out(X,y,path)
-
+# show a pdb structure colored with lips probability
 def results3D(args):
     import pymol
     from pymol import cmd, util
 
+    # get path adn pdb id
     path = args.path
     pdb_id = args.pdb_id
 
+    # check if result file exists else print error
+    if not isfile(path):
+        print "File \"{}\" has not been found.".format(path)
+        return
+
+    # open file
     file = open(path,'r')
-
     pymol.finish_launching()  # Open Pymol (not necessary from pyMOL 2.1)
-
+    # fetch pdb id
     cmd.fetch(pdb_id, pdb_id)  # Download the PDB
+    # Hide lines
+    cmd.hide("lines", pdb_id)
+    # Show ribbon
+    cmd.show("cartoon", pdb_id)
+    # Set all B-factor to 0.0
+    cmd.alter("(all)", "b=0.0")
 
-    cmd.hide("lines", pdb_id)  # Hide lines
-    cmd.show("cartoon", pdb_id)  # Show ribbon
-
-    cmd.alter("(all)", "b=0.0")  # Set all B-factor to 0.0
-
+    # multiple pdb ids can be found in results files, set this to true when desired id is found
     disp_flag = False
+    # for each line in the file
     for line in file:
+        # if reading the desired id
         if disp_flag:
+            # if encountering another id start line set flag to false again and exit
             if re.match(">", line):
                 disp_flag = False
+                break
+            # else it is a line of desired pdb id
             else:
+                # split the line
                 identifier, prob, binary_prob = line.split()
                 model, chain, index, insertion_code, name = identifier.split('/')
+                # Residue selection in Pymol syntax
+                residue_string = '{}/{}{}/'.format(chain, index, '')
+                 # Substitute the B-score with the LIP score
+                cmd.alter(residue_string, "b={:2f}".format(float(prob)))
 
-                residue_string = '{}/{}{}/'.format(chain, index, '')  # Residue selection in Pymol syntax
-                cmd.alter(residue_string, "b={:2f}".format(float(prob)))  # Substitute the B-score with the LIP score
-
+        # if the line was the right start of desired id set flag to true
         if re.match(">{}".format(pdb_id), line):
-            print "GOT IT"
             disp_flag = True
             
-
-    cmd.spectrum("b", palette="rainbow", selection="(all)")  # color by B-factor values
+    # color all residues by their B-factor
+    cmd.spectrum("b", palette="rainbow", selection="(all)")
+    # close file
     file.close()
+    return 
 
 
 
 
-
+# show values of a feature in pymol
 def feature3D(args):
     import pymol
     from pymol import cmd, util
 
+    # get parameters
     pdb_id = args.pdb_id
-    win_length = args.win_length
+    short_win = args.short_win
+    large_win = args.large_win
     contact_threshold = args.contact_threshold
     feature_name = args.feature_name
 
-    residues, features, lip_indexes = prot_dataset.generate_test(pdb_id, short_win= win_length, large_win = 60, contact_threshold= contact_threshold)
+    # compute features for each residue in a labelled chain
+    residues, features, lip_indexes = prot_dataset.generate_test(pdb_id, short_win= short_win, large_win = large_win, contact_threshold= contact_threshold)
+    # make a dataframe
     df = prot_dataset.as_dataframe(features,lip_indexes)
+    # get the array with desired feature
     feature = df[feature_name]
 
-    pymol.finish_launching()  # Open Pymol (not necessary from pyMOL 2.1)
-    cmd.fetch(pdb_id, pdb_id)  # Download the PDB
+    # Open Pymol (not necessary from pyMOL 2.1)
+    pymol.finish_launching()
+    # Download the PDB
+    cmd.fetch(pdb_id, pdb_id)
+    # Hide lines
+    cmd.hide("lines", pdb_id)
+    # Show ribbon
+    cmd.show("cartoon", pdb_id)
+    # Set all B-factor to 0.0
+    cmd.alter("(all)", "b=0.0")
 
-    cmd.hide("lines", pdb_id)  # Hide lines
-    cmd.show("cartoon", pdb_id)  # Show ribbon
-
-    cmd.alter("(all)", "b=0.0")  # Set all B-factor to 0.0
-
-
+    # for each residue 
     for i in range(0,len(residues)):
-        residue_string = '{}/{}{}/'.format(residues[i].get_full_id()[2], residues[i].id[1], '')  # Residue selection in Pymol syntax
-        cmd.alter(residue_string, "b={:2f}".format(feature[i]))  # Substitute the B-score with the LIP score
+        # Residue selection in Pymol syntax
+        residue_string = '{}/{}{}/'.format(residues[i].get_full_id()[2], residues[i].id[1], '')
+        # Substitute the B-score with the feature score
+        cmd.alter(residue_string, "b={:2f}".format(feature[i]))
+        # If the residue is labelled as LIP show it as sphere
         if lip_indexes[i] == 1:
             cmd.show_as("spheres", "chain {} and resi {}".format(residues[i].get_full_id()[2], residues[i].id[1]))
 
-    cmd.spectrum("b", palette="rainbow", selection="(all)")  # color by B-factor values
+    # color by B-factor values
+    cmd.spectrum("b", palette="rainbow", selection="(all)")
 
 
 #######################################################
 #################  MAIN PROGRAM   #####################
 #######################################################
+# parse the dataset
 prot_dataset = ProteinDataset()
 prot_dataset.parse()
 
@@ -239,7 +285,7 @@ subparsers = parser.add_subparsers(help='sub-command help')
 
 # create the parser for the "plots" command
 parser_plots = subparsers.add_parser('plots', help='Show boxplots and scatterplots about the features used in this program')
-parser_plots.add_argument('-p','--path', nargs='?', default ="../sets/rand_all_w4d4.5.txt" ,help='Specify the training set to plot. Default is "./rand_all_w4d4.5.txt"')
+parser_plots.add_argument('-p','--path', nargs='?', default ="../sets/plots.txt" ,help='Specify the training set to plot. Default is "../sets/plots.txt"')
 # set default function
 parser_plots.set_defaults(func=show_plots)
 
@@ -259,41 +305,26 @@ parser_down_ring.set_defaults(func=download_ring_files)
 
 # create the parser for the "show3d" command
 parser_show3d= subparsers.add_parser('show3d', help='Show lip residues and a feature in pymol.')
-parser_show3d.add_argument('pdb_id', type= str, help='Specify the id to show.')
-parser_show3d.add_argument('feature_name', choices= prot_dataset.features_names, help='Feature to show.')
-parser_show3d.add_argument('-w','--win_length', type= int, nargs='?', default=4, help='Specify the win_length.')
-parser_show3d.add_argument('-c','--contact_threshold', type= float, nargs='?', default=6, help='Specify the contact threshold.')
+parser_show3d.add_argument('pdb_id', type= str, help='The pdb id that pymol has to fetch.')
+parser_show3d.add_argument('feature_name', choices= prot_dataset.features_names, help='Name of the feature to show.')
+parser_show3d.add_argument('-sw','--short_win', type= int, nargs='?', default=4, help='Length of short window to be used in feature extraction. Default is 4.')
+parser_show3d.add_argument('-lw','--large_win', type= int, nargs='?', default=30, help='Length of large window to be used in feature extraction. Default is 30.')
+parser_show3d.add_argument('-c','--contact_threshold', type= float, nargs='?', default=5, help='Contact threshold to be used in feature extraction. Default is 5.')
 # set default function
 parser_show3d.set_defaults(func=feature3D)
-
-
 
 # create the parser for the "results3d" command
 parser_results3d= subparsers.add_parser('results3d', help='Show lip residues and a feature in pymol.')
 parser_results3d.add_argument('pdb_id', type= str, help='Specify the id to show.')
-parser_results3d.add_argument('-p','--path', nargs='?', default = '../results.txt' ,help='Specify path for the output file. Default is "../results.txt"')
-
+parser_results3d.add_argument('-p','--path', nargs='?', default = '../results.txt' ,help='Specify path of the results file that contains the predictions of the desired pdb id. Default is "../results.txt"')
 # set default function
 parser_results3d.set_defaults(func=results3D)
 
 
 # create the parser for the "rand_data" command
-parser_rand_dataset= subparsers.add_parser('rand_data', help='Generate a random dataset taking nex examples from every chain.')
-parser_rand_dataset.add_argument('pdb_ids', type= str, nargs='+', help='Ids used to generate examples')
-parser_rand_dataset.add_argument('-w','--win_length', type= int, nargs='?', default=4, help='Specify the win_length.')
-parser_rand_dataset.add_argument('-c','--contact_threshold', type= float, nargs='?', default=6, help='Specify the contact threshold.')
-parser_rand_dataset.add_argument('-x','--n_examples', type= int, nargs='?', default=10, help='Number of examples selected for every chain.')
-parser_rand_dataset.add_argument('-b','--balance', default = False, action='store_true', help='Balance number of positive and negative examples.')
-parser_rand_dataset.add_argument('-p','--path', nargs='?' ,help='Specify path for the output file. Default is "../sets/training.txt"')
-
-# set default function
-parser_rand_dataset.set_defaults(func=random_dataset)
-
-# create the parser for the "rand_data" command
 parser_run= subparsers.add_parser('run', help='Run the program with parameters specified in configuration file.')
-parser_run.add_argument('-p','--path', type= str, nargs='?', default="../config.json", help='Path to configuration file')
-parser_run.add_argument('-i', '--pdb_ids', type= str, metavar='id', nargs='+' , help='Specify the ids to predict.')
-
+parser_run.add_argument('-p','--path', type= str, nargs='?', default="../config.json", help='Path to configuration file. Default is "../config.json"')
+parser_run.add_argument('-i', '--pdb_ids', type= str, metavar='id', nargs='+' , help='Specify the ids to predict, overriding configuration file. If the first id is "all" every id in dataset is computed.')
 # set default function
 parser_run.set_defaults(func=run_from_config)
 
@@ -301,39 +332,3 @@ parser_run.set_defaults(func=run_from_config)
 args = parser.parse_args()
 # call default function giving arguments
 args.func(args)
-
-
-
-
-#long_prot =["1cee","1dev","1dow","1fqj","1g3j","1hrt","1i7w","1j2j","1jsu","1l8c","1p4q","1q68","1rf8","1sc5","1sqq","1tba","1th1","1xtg","1zoq","2a6q","2auh","2c1t","2o8a"]
-#short_prot = []
-#for prot in prot_list:
-#    if prot not in long_prot:
-#        short_prot.append(prot)
-#
-#prot_list_test = short_prot[6:-1] + long_prot[6:-1]
-#prot_list_tr = short_prot[0:6] + long_prot[0:6]
-
-
-#residues, X_tr, y_tr= prot_dataset.generate_random_examples(prot_list, 4, 4.5, 10)
-
-
-
-
-#print X_tr
-#print y_tr
-#print "#############################"
-#print "           TRUTH"
-#print "#############################"
-#print y_test
-#
-#print "#############################"
-#print "         PREDICTIONS"
-#print "#############################"
-#print predictions
-#print "\n"
-#print "accuracy:  {}".format(metrics.accuracy_score(y_test, predictions))
-#print "precision: {}".format(metrics.precision_score(y_test, predictions))
-#print "recall:    {}".format(metrics.recall_score(y_test, predictions))
-
-#print clf.get_params()

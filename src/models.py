@@ -7,9 +7,21 @@ from sklearn import metrics
 import matplotlib.pyplot as plt
 import copy
 import pickle
+import random
 import sys
 from os.path import isfile
 
+#default_training_ids = ['2ivz','1dow','1hrt','1i7w','1j2j','1l8c','1rf8','1sqq','3b71','1a3b','1hv2','1ozs','1i8h','1axc','2gl7','1h2k','1ycq','1fv1','1kdx','1cqt']
+default_training_ids = ["1p22","1ozs","2gsi","1fqj","1o9a","1kdx","1i7w","1hv2","1dev","1tba","1sc5","1lm8","1sb0","2phe","1i8h","1fv1","1l8c","2o8a","2gl7","1rf8","1cqt","2nl9","1hrt"]
+default_choosen_features = [
+			"IrIa_CC", 
+			"Intra",
+			"Inter",
+			"S_Dist", 
+			"S_Ang", 
+			"S_Ang/Dist",
+			"L_Dist/Seq_Len", 
+			]
 
 def test(clf, test_name,  sw = 4, lw = 60, ct = 6, epc = 100, choosen_features = None, tr_prots = None):
 	print "###############################################################################################"
@@ -21,29 +33,20 @@ def test(clf, test_name,  sw = 4, lw = 60, ct = 6, epc = 100, choosen_features =
 
 	######## DEFAULT FEATURES FOR THIS TEST #########
 	if not choosen_features:
-		choosen_features = [
-			"IrIa_CC", 
-			"Intra",
-			"Inter",
-			"S_Dist", 
-			"S_Ang", 
-			"S_Ang/Dist",
-			"L_Dist/Seq_Len", 
-			]
+		choosen_features = default_choosen_features
 
 	######## DEFAULT PDB IDS FOR THIS TEST #########
 	if not tr_prots:
-		tr_prots = ['2ivz','1dow','1hrt','1i7w','1j2j','1l8c','1rf8','1sqq','3b71','1a3b','1hv2','1ozs','1i8h','1axc','2gl7','1h2k','1ycq','1fv1','1kdx','1cqt']
-
+		tr_prots = default_training_ids
 	######## TEST SET GENERATION #########
 	df = None
 
-	if isfile("../sets/{}.txt".format(test_name)):
+	if isfile("../tests/{}_trs.txt".format(test_name)):
 		print "Dataset found"
-		df = prot_dataset.training_set_in(path = "../sets/{}.txt".format(test_name))
+		df = prot_dataset.training_set_in(path = "../tests/{}_trs.txt".format(test_name))
 	else:
 		res, X, y = prot_dataset.generate_random_examples(tr_prots, short_win = sw, large_win = lw, contact_threshold = ct, ex_per_chain = epc)
-		prot_dataset.training_set_out(X,y, path = "../sets/{}.txt".format(test_name))
+		prot_dataset.training_set_out(X,y, path = "../tests/{}_trs.txt".format(test_name))
 		df = prot_dataset.as_dataframe(X,y)
 
 
@@ -65,7 +68,7 @@ def test(clf, test_name,  sw = 4, lw = 60, ct = 6, epc = 100, choosen_features =
 	avg_y = []
 
 	# clear output file if exists
-	clear_result_file("../tests/{}.txt".format(test_name))
+	clear_result_file("../tests/{}_res.txt".format(test_name))
 
 	# foreach test pdb id 
 	for t_p in test_prots:
@@ -82,7 +85,7 @@ def test(clf, test_name,  sw = 4, lw = 60, ct = 6, epc = 100, choosen_features =
 		predictions = blur_by_chain(res_test, predictions)
 
 		# output predictions to file
-		out_predictions(t_p, res_test, predictions, path = "../tests/{}.txt".format(test_name))
+		out_predictions(t_p, res_test, predictions, path = "../tests/{}_res.txt".format(test_name))
 
 		# compute binary predictions
 		bin_pred = prob_to_binary(predictions)
@@ -387,21 +390,43 @@ def find_best_max_depth():
 		it += 1
 
 def test_features():
-		features = [
-		"IrIa_CC", 
-		"Intra",
-		"Inter",
-		"L_CC",
-		"S_CC",
-		"S_Dist", 
-		"S_Ang", 
-		"S_Ang/Dist",
-		"L_Seq_Len", 
-		"L_Dist/Seq_Len", 
-		"L_Ang",
-		"L_Ang/Dist"
-		]
+	features = [
+	"IrIa_CC", 
+	"Intra",
+	"Inter",
+	"S_Dist", 
+	"S_Ang", 
+	"S_Ang/Dist",
+	"L_Seq_Len", 
+	"L_Dist/Seq_Len", 
+	"L_Ang/Dist"
+	]
+	print test(MLPClassifier(hidden_layer_sizes = [6,3,3,3,3,3], max_iter = 500, random_state = 1), "fea_test",lw = 30, choosen_features = features)
 
-		print test(MLPClassifier(hidden_layer_sizes = [2,2,2,2,2,2], max_iter = 500, random_state = 1), "fea_test",lw = 30, choosen_features = features)
+def test_pdb_ids():
+	prot_dataset = ProteinDataset()
+	prot_dataset.parse()
+	ids_list = prot_dataset.get_prot_list()
+	results_list = []
+	random.seed(1)
+	for test_n in range(1,11):
+		sel_list = []
+		while len(sel_list) < 20:
+			index = random.randrange(len(ids_list))
+			if ids_list[index] not in sel_list:
+				sel_list.append(ids_list[index])
 
-test_features()
+		results_list.append((str(sel_list), test(RandomForestClassifier(max_depth = 10, random_state = 1), "id_test_{}".format(test_n), tr_prots = sel_list)))
+
+	print "###############################################################################################"
+	print "FINAL RESULTS"
+	for results in results_list:
+		ids, resu = results
+		print 
+		print " training_set: {}".format(ids)
+		print resu
+	return 
+
+	
+#test(RandomForestClassifier(max_depth = 10, random_state = 1), "default_training_set", tr_prots =["1p22", "1ozs", "2gsi", "1fqj", "1o9a", "1kdx", "1i7w", "1hv2", "1dev", "1tba", "1sc5", "1lm8", "1sb0", "2phe", "1i8h", "1fv1", "1l8c", "2o8a", "2gl7", "1rf8", "1cqt", "2nl9", "1hrt"])
+																								
