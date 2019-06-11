@@ -1,0 +1,84 @@
+{
+	"short-window":4,
+	"large-window":30,
+	"contact-threshold":5,
+
+	"make-training-set" : false,
+	"examples-per-chain" : 100,
+	"balance" : false,
+	"positive-lb": 40,
+	"training-set-path" : "sets/training.txt",
+	"training-ids" : [
+		"1p22",
+		"1ozs",
+		"2gsi",
+		"1fqj",
+		"1o9a",
+		"1kdx",
+		"1i7w",
+		"1hv2",
+		"1dev",
+		"1tba",
+		"1sc5",
+		"1lm8",
+		"1sb0",
+		"2phe",
+		"1i8h",
+		"1fv1",
+		"1l8c",
+		"2o8a",
+		"2gl7",
+		"1rf8",
+		"1cqt",
+		"2nl9",
+		"1hrt"
+	],
+
+	"fit-model" : false,
+	"model-type": "random-forest",
+	"trained-model-path" : "trained.sav",	
+	"features": [
+		"IrIa_CC", 
+		"Intra",
+		"Inter",
+		"S_Dist", 
+		"S_Ang", 
+		"S_Ang/Dist",
+		"L_Seq_Len", 
+		"L_Dist/Seq_Len", 
+		"L_Ang",
+		"L_Ang*Dist"
+		],
+
+	"predict" : true,
+	"predict-ids":[
+		"all"
+	],
+	"probability-blur": true,
+	"probability-blur-len": 6,
+	"result-file": "results.txt",
+
+
+	"decision-tree": {
+		"max-depth":7,
+		"random-state":1
+	},
+
+	"random-forest": {
+		"n-estimators":10,
+		"max-depth":null,
+		"random-state":1
+	},
+
+
+	"multi-layer-perceptron": {
+		"hidden-layers":[2,2,2,2,2,2],
+		"activation":"relu",
+		"solver":"adam",
+		"alpha":0.0001,
+		"learning-rate-init":0.001,
+		"max-iter":500,
+		"tol":1e-4,
+		"random-state":1
+	}
+}
