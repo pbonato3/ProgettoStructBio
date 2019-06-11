@@ -13,7 +13,7 @@ pdb	chain	start	end	type
 1hrt	I	1	24	long
 1hrt	I	49	65	long
 1i7w	A	neg	neg	long
-1j2j	B	neg	neg	long
+1j2j	A	neg	neg	long
 1j2j	B	168	205	long
 1jsu	A	neg	neg	long
 1jsu	B	neg	neg	long

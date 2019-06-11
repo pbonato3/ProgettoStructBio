@@ -52,17 +52,14 @@ def test(clf, test_name,  sw = 4, lw = 60, ct = 6, epc = 100, choosen_features =
 	if not tr_prots:
 		tr_prots = default_training_ids
 	######## TEST SET GENERATION #########
-	df = None
 
 	if isfile(test_folder_path+"{}_trs.txt".format(test_name)):
 		print "Dataset found"
-		df = prot_dataset.training_set_in(path = test_folder_path+"{}_trs.txt".format(test_name))
 	else:
 		res, X, y = prot_dataset.generate_random_examples(tr_prots, short_win = sw, large_win = lw, contact_threshold = ct, ex_per_chain = epc)
 		prot_dataset.training_set_out(X,y, path = test_folder_path+"{}_trs.txt".format(test_name))
-		df = prot_dataset.as_dataframe(X,y)
 
-
+	df = prot_dataset.training_set_in(path = test_folder_path+"{}_trs.txt".format(test_name))
 
 	# fit classifier
 	clf.fit(df[choosen_features],df['y'])
@@ -361,12 +358,12 @@ def find_best_small_window():
 # test large window sizes on a range
 def find_best_large_window():
 	results_list = []
-	for lw in [40,45,50,55,60,70,75,80,85,90]:
-		results_list.append(test(DecisionTreeClassifier(max_depth = 7, random_state = 1), "lw_{}_test".format(lw), lw = lw))
+	for lw in [15,20,25,30,35,40,45,50]:
+		results_list.append(test(RandomForestClassifier(max_depth = 10, random_state = 1), "lw_{}_test".format(lw), lw = lw))
 
 	print "###############################################################################################"
 	print "FINAL RESULTS"
-	it = 40
+	it = 15
 	for results in results_list:
 		print 
 		print "Large Window Size {}".format(it)
@@ -412,9 +409,9 @@ def test_features():
 	"S_Ang/Dist",
 	"L_Seq_Len", 
 	"L_Dist/Seq_Len", 
-	"L_Ang/Dist"
+	"L_Ang*Dist"
 	]
-	print test(MLPClassifier(hidden_layer_sizes = [6,3,3,3,3,3], max_iter = 500, random_state = 1), "fea_test",lw = 30, choosen_features = features)
+	print test(RandomForestClassifier(max_depth = 10, random_state = 1), "fea_test", choosen_features = features)
 
 def test_pdb_ids():
 	prot_dataset = ProteinDataset()
@@ -442,4 +439,4 @@ def test_pdb_ids():
 
 	
 #test(RandomForestClassifier(max_depth = 10, random_state = 1), "default_training_set", tr_prots =["1p22", "1ozs", "2gsi", "1fqj", "1o9a", "1kdx", "1i7w", "1hv2", "1dev", "1tba", "1sc5", "1lm8", "1sb0", "2phe", "1i8h", "1fv1", "1l8c", "2o8a", "2gl7", "1rf8", "1cqt", "2nl9", "1hrt"])
-																								
+#test_features()																						

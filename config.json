@@ -7,7 +7,7 @@
 	"examples-per-chain" : 100,
 	"balance" : false,
 	"positive-lb": 40,
-	"training-set-path" : "sets/default_training_set.txt",
+	"training-set-path" : "sets/training.txt",
 	"training-ids" : [
 		"1p22",
 		"1ozs",
@@ -34,9 +34,9 @@
 		"1hrt"
 	],
 
-	"fit-model" : true,
+	"fit-model" : false,
 	"model-type": "random-forest",
-	"trained-model-path" : "trained-model.sav",	
+	"trained-model-path" : "trained.sav",	
 	"features": [
 		"IrIa_CC", 
 		"Intra",
@@ -47,7 +47,7 @@
 		"L_Seq_Len", 
 		"L_Dist/Seq_Len", 
 		"L_Ang",
-		"L_Ang/Dist"
+		"L_Ang*Dist"
 		],
 
 	"predict" : true,

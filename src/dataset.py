@@ -197,7 +197,7 @@ def extract_long_range_features(residues, central_index, win_length):
 		chain_dist/seq_length, 
 		chain_angle,
 		# adding a small amount to chain dist to avoid division by zero 
-		(chain_angle/10)/(chain_dist + 0.001)
+		(chain_angle/10)*chain_dist/seq_length,
 		]
 
 
@@ -410,7 +410,7 @@ class ProteinDataset:
 		"L_Seq_Len", 
 		"L_Dist/Seq_Len", 
 		"L_Ang",
-		"L_Ang/Dist"
+		"L_Ang*Dist"
 		]
 
 	# parse the lips_dataset from file

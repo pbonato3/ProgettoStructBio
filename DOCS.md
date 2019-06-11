@@ -16,6 +16,10 @@ In **src** folder there are:
 * *models.py*: the file that constains all usefull functions needed to train, predict and evaluate models.
 
 ## Usage instructions
+This program is designed to be used with Python 2 to interact with pymol.
+
+To run the program navigate to src folder and write **python lips_predictor.py -h**
+
 This project uses relative paths but variables are set to find right paths even if running the program from main directory.
 When a path is given in input the program appends the main folder location in front of it.
 For example to point to *sets* folder the right path is "*sets/a_set.txt*".
@@ -154,22 +158,56 @@ If set to true applyes a blur filtering over probability predictions by chain. B
 
 ## Features
 
-Features are:
+Boxplots about discriminance of the features can be seen using command *python lips_predictor.py plots*. 
 
-- IrIa_CC
-- Intra
-- Inter
-- L_CC
-- S_CC
-- f_I
-- f_II
-- f_III
-- f_IV
-- f_V
-- S_Dist
-- S_Ang
-- S_Ang/Dist
-- L_Seq_Len
-- L_Dist/Seq_Len
-- L_Ang
-- L_Ang/Dist
+##### IrIa_CC
+Stands for Inter over Intra Chain Contacts. Contacts are computed using RING software and it is possible to configure a threshold. 
+This feature is one of the most important to discriminate between LIP and not LIP residues, cause an higher ratio is expected.
+It is possible to configure a threshold that is usefull to discard too long contacts.
+
+##### Intra
+Stands for Intra-Chain Contacts. Can be usefull to discriminate between LIP and not LIP residues, but seems less important than *IrIa_CC*.
+This feature is extracted from shorter window and meaned by number of residues in the window.
+
+##### Inter
+Stands for Inter-Chain Contacts. Can be usefull to discriminate between LIP and not LIP residues, but seems less important than *IrIa_CC*.
+This feature is extracted from shorter window and meaned by number of residues in the window.
+
+##### L_CC
+Stands for Long-Chain Contacts. It is computed considering contacts threshold: if it is longer than half the threshold distance, a contact is considered long. Seems that there is no significative difference between LIP and not LIP residues.
+This feature is extracted from shorter window and meaned by number of residues in the window.
+
+##### S_CC
+Stands for Short-Chain Contacts. It is computed considering contacts threshold: if it is shorter than half the threshold distance, a contact is considered short. Seems that there is no significative difference between LIP and not LIP residues.
+This feature is extracted from shorter window and meaned by number of residues in the window.
+
+##### f_I, f_II, f_III, f_IV, f_V
+These five features are extracted from:
+> Solving the protein sequence metric problem
+> - William R. Atchley, Jieping Zhao, Andrew D. Fernandes, and Tanja Drüke
+Every feature is a cluster of chmical-phisical propertyes with high covariance. They don't seems to be so usefult for this task.
+Each feature is extracted from shorter window and meaned by number of residues in the window.
+
+##### S_Dist
+Stands for Short Window Distance. It represents the distance (in Armstrong) between the frist and last residue in the shorter window.
+Togheter with *S_Ang* can be very good to recognise secondary structures, but doesn't seems to discriminate LIP.
+This feature is extracted from shorter window and meaned by number of residues in the window.
+
+##### S_Ang
+Stands for Short Window Angle. It represents the angle (degrees) between frist, central and last residue in the shorter window.
+Togheter with *S_Dist* can be very good to recognise secondary structures, but doesn't seems to discriminate LIP.
+
+##### S_Ang/Dist
+Stands for Short Window Angle over Mean Distance. Can be very good to recognise secondary structures, but doesn't seems to discriminate LIP.
+
+##### L_Seq_Len
+Stands for Large Window Sequence Length and it is the raw count of residues in the largest window. It is perfectly normal that it variates between window length and half window length (at the beginning of the chain), but when lower it covers the entire chain. In this case from the dataset seems there is a very high probability of being a LIP.
+
+##### L_Dist/Seq_Len
+Stands for Large Window Mean Distance over Sequence Length. *L_Dist* is the distance (in Armstrong) between the frist and last residue in the larger window. It is one of the most usefull features for LIP prediction task cause it represent a measure of linearity of the structure.
+
+##### L_Ang
+Stands for Large Window Angle. It represents the angle (degrees) between frist, central and last residue in the larger window. It can be considered as another measure of linearity of the structure but it doesn't perform as good as *L_Dist/Seq_Len*.
+
+##### L_Ang*Dist
+Stands for Large Window Angle multiplied Mean Distance. It is a union of Large Window linearity measures. It seems to improve a little the score compared to *L_Dist/Seq_Len*.
