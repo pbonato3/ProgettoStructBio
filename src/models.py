@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from dataset import ProteinDataset, aa_3to1
-from sklearn.tree import DecisionTreeClassifier, export_graphviz
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn import metrics
@@ -437,6 +437,20 @@ def test_pdb_ids():
 		print resu
 	return 
 
-	
+
+def print_tree():
+	from sklearn.tree import export_graphviz
+
+	clf = DecisionTreeClassifier(max_depth = 8, random_state = 1)
+	features = ["IrIa_CC","Intra","Inter","S_Dist","S_Ang","S_Ang/Dist","L_Seq_Len","L_Dist/Seq_Len","L_Ang*Dist"]
+	prot_dataset = ProteinDataset()
+	df = prot_dataset.training_set_in(path = sets_folder_path+"default_training_set.txt")
+
+	clf.fit(df[features],df['y'])
+	export_graphviz(clf , out_file = main_folder_path+"tree.gv", feature_names=features, filled=True, rounded=True)
+	return 
+
+#print_tree()
+
 #test(RandomForestClassifier(max_depth = 10, random_state = 1), "default_training_set", tr_prots =["1p22", "1ozs", "2gsi", "1fqj", "1o9a", "1kdx", "1i7w", "1hv2", "1dev", "1tba", "1sc5", "1lm8", "1sb0", "2phe", "1i8h", "1fv1", "1l8c", "2o8a", "2gl7", "1rf8", "1cqt", "2nl9", "1hrt"])
 #test_features()																						
