@@ -36,7 +36,7 @@
 
 	"fit-model" : false,
 	"model-type": "random-forest",
-	"trained-model-path" : "trained.sav",	
+	"trained-model-path" : "default_model.sav",	
 	"features": [
 		"IrIa_CC", 
 		"Intra",
@@ -56,7 +56,7 @@
 	],
 	"probability-blur": true,
 	"probability-blur-len": 6,
-	"result-file": "results.txt",
+	"result-folder": "results/",
 
 
 	"decision-tree": {

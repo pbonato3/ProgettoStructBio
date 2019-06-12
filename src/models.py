@@ -19,10 +19,11 @@ if getcwd().endswith("/src"):
     main_folder_path = '../'
     src_folder_path = './'
 
-pdb_folder_path  = main_folder_path+'pdb_files/'
-ring_folder_path = main_folder_path+'ring_files/'
-sets_folder_path = main_folder_path+'sets/'
-test_folder_path = main_folder_path+'tests/'
+pdb_folder_path  	= main_folder_path+'pdb_files/'
+ring_folder_path 	= main_folder_path+'ring_files/'
+sets_folder_path 	= main_folder_path+'sets/'
+test_folder_path 	= main_folder_path+'tests/'
+results_folder_path = main_folder_path+'results/'
 
 #default_training_ids = ['2ivz','1dow','1hrt','1i7w','1j2j','1l8c','1rf8','1sqq','3b71','1a3b','1hv2','1ozs','1i8h','1axc','2gl7','1h2k','1ycq','1fv1','1kdx','1cqt']
 default_training_ids = ["1p22","1ozs","2gsi","1fqj","1o9a","1kdx","1i7w","1hv2","1dev","1tba","1sc5","1lm8","1sb0","2phe","1i8h","1fv1","1l8c","2o8a","2gl7","1rf8","1cqt","2nl9","1hrt"]
@@ -77,9 +78,6 @@ def test(clf, test_name,  sw = 4, lw = 60, ct = 6, epc = 100, choosen_features =
 	avg_pred = []
 	avg_y = []
 
-	# clear output file if exists
-	clear_result_file(test_folder_path+"{}_res.txt".format(test_name))
-
 	# foreach test pdb id 
 	for t_p in test_prots:
 		# generate test dataset
@@ -95,7 +93,7 @@ def test(clf, test_name,  sw = 4, lw = 60, ct = 6, epc = 100, choosen_features =
 		predictions = blur_by_chain(res_test, predictions)
 
 		# output predictions to file
-		out_predictions(t_p, res_test, predictions, path = test_folder_path+"{}_res.txt".format(test_name))
+		out_predictions(t_p, res_test, predictions, path = test_folder_path+"{}_results/".format(test_name))
 
 		# compute binary predictions
 		bin_pred = prob_to_binary(predictions)
@@ -223,18 +221,13 @@ def prob_to_binary(pred):
 			new.append(0)
 	return new
 
-# the file is opened in 'append' mode so can be useful to clear it at the beginning
-def clear_result_file(path = main_folder_path+"results.txt"):
-	if isfile(path):
-		file = open(path, 'w')
-		file.close()
 
 # output predictions to file
-def out_predictions(p_id, residues, predictions, path = main_folder_path+"results.txt"):
+def out_predictions(p_id, residues, predictions, path = results_folder_path):
 	# compute the binary classification
 	bin_pred = prob_to_binary(predictions)
 	# open file in append mode
-	file = open(path, 'a')
+	file = open(path+p_id+"_res.txt", 'w')
 	# write the pdb id
 	file.write(">{}\n".format(p_id))
 	# for each residue, print the id and probability in given format
@@ -294,12 +287,9 @@ def model_in(path = main_folder_path+"trained-model.sav"):
 
 
 # predict a list of pdb ids using the given classifier and parameters. then output the results to file
-def predict(clf, pdb_ids, features, short_win, large_win, contact_threshold, path = main_folder_path+"results.txt", blur = True, blur_w = 6):
+def predict(clf, pdb_ids, features, short_win, large_win, contact_threshold, path = results_folder_path, blur = True, blur_w = 6):
 	# initialize a proteinDataset object
 	prot_dataset = ProteinDataset()
-
-	# clear the restult file if exists
-	clear_result_file(path)
 
 	# printing purpose only
 	done_counter = 0

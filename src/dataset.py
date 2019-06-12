@@ -27,6 +27,8 @@ pdb_folder_path  = main_folder_path+'pdb_files/'
 ring_folder_path = main_folder_path+'ring_files/'
 sets_folder_path = main_folder_path+'sets/'
 test_folder_path = main_folder_path+'tests/'
+results_folder_path = main_folder_path+'results/'
+
 
 aa_3to1 = {
 	'CYS': 'C', 'ASP': 'D', 'SER': 'S', 'GLN': 'Q', 'LYS': 'K',

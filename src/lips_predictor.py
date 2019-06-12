@@ -19,6 +19,7 @@ pdb_folder_path  = main_folder_path+'pdb_files/'
 ring_folder_path = main_folder_path+'ring_files/'
 sets_folder_path = main_folder_path+'sets/'
 test_folder_path = main_folder_path+'tests/'
+results_folder_path = main_folder_path+'results/'
 
 
 # parse the configuration file
@@ -122,7 +123,7 @@ def run_from_config(args):
             short_win = params["short-window"], 
             large_win = params["large-window"], 
             contact_threshold = params["contact-threshold"],
-            path = main_folder_path+params["result-file"],
+            path = main_folder_path+params["result-folder"],
             blur = params["probability-blur"],
             blur_w = params["probability-blur-len"]
             )
@@ -191,7 +192,6 @@ def results3D(args):
 
     # get path adn pdb id
     path = main_folder_path+args.path
-    pdb_id = args.pdb_id
 
     # check if result file exists else print error
     if not isfile(path):
@@ -200,9 +200,15 @@ def results3D(args):
 
     # open file
     file = open(path,'r')
-    pymol.finish_launching()  # Open Pymol (not necessary from pyMOL 2.1)
+    # get the header
+    header = file.next()
+    #extract pdb id from header
+    pdb_id = header.replace('>','').replace('\n','')
+
+    # Open Pymol (not necessary from pyMOL 2.1)
+    pymol.finish_launching() 
     # fetch pdb id
-    cmd.fetch(pdb_id, pdb_id)  # Download the PDB
+    cmd.fetch(pdb_id, pdb_id) 
     # Hide lines
     cmd.hide("lines", pdb_id)
     # Show ribbon
@@ -210,30 +216,17 @@ def results3D(args):
     # Set all B-factor to 0.0
     cmd.alter("(all)", "b=0.0")
 
-    # multiple pdb ids can be found in results files, set this to true when desired id is found
-    disp_flag = False
+
     # for each line in the file
     for line in file:
-        # if reading the desired id
-        if disp_flag:
-            # if encountering another id start line set flag to false again and exit
-            if re.match(">", line):
-                disp_flag = False
-                break
-            # else it is a line of desired pdb id
-            else:
-                # split the line
-                identifier, prob, binary_prob = line.split()
-                model, chain, index, insertion_code, name = identifier.split('/')
-                # Residue selection in Pymol syntax
-                residue_string = '{}/{}{}/'.format(chain, index, '')
-                 # Substitute the B-score with the LIP score
-                cmd.alter(residue_string, "b={:2f}".format(float(prob)))
+        # split the line
+        identifier, prob, binary_prob = line.split()
+        model, chain, index, insertion_code, name = identifier.split('/')
+        # Residue selection in Pymol syntax
+        residue_string = '{}/{}{}/'.format(chain, index, '')
+         # Substitute the B-score with the LIP score
+        cmd.alter(residue_string, "b={:2f}".format(float(prob)))
 
-        # if the line was the right start of desired id set flag to true
-        if re.match(">{}".format(pdb_id), line):
-            disp_flag = True
-            
     # color all residues by their B-factor
     cmd.spectrum("b", palette="rainbow", selection="(all)")
     # close file
@@ -330,8 +323,7 @@ parser_show3d.set_defaults(func=feature3D)
 
 # create the parser for the "results3d" command
 parser_results3d= subparsers.add_parser('results3d', help='Shows the pdb structure in pymol, coloring residues with probability of being LIPs Blue (not LIP) to Red (is LIP).')
-parser_results3d.add_argument('pdb_id', type= str, help='Specify the id to show.')
-parser_results3d.add_argument('-p','--path', nargs='?', default = 'results.txt' ,help='Specify path of the results file that contains the predictions of the desired pdb id. Default is "../results.txt"')
+parser_results3d.add_argument('path', type= str, help='Specify the path to the file containg prediction results.')
 # set default function
 parser_results3d.set_defaults(func=results3D)
 

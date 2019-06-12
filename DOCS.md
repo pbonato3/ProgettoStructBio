@@ -7,6 +7,7 @@ In the main folder can be found :
 - **sets**        folder: that is the default location of training sets.
 - **img**         folder: containing some images collected during developement.
 - **tests**       folder: that is the default location of files used while performing tests during developement.
+- **results**	  folder: that is the default location of prediction results file.
 
 In sets files it is also stored lips_dataset.txt that is the high level dataset used for training.
 
@@ -16,13 +17,13 @@ In **src** folder there are:
 * *models.py*: the file that contains all useful functions needed to train, predict and evaluate models.
 
 ## Usage instructions
-This program is designed to be used with Python 2 to interact with pymol.
-
 To run the program navigate to src folder and write **python lips_predictor.py -h**
+The help command contains all the informations about the usage
 
 This project uses relative paths but variables are set to find right paths even if running the program from main directory.
-When a path is given in input the program appends the main folder location in front of it.
-For example to point to *sets* folder the right path is "*sets/a_set.txt*".
+***Important Notice:***
+When a path is given in input, the program appends the main folder location in front of it.
+For example to give the path to a file in *sets* folder, the right path is "*sets/a_set.txt*".
 
 The program needs pdb and ring files situated in the correct folders in order to work properly.
 
@@ -45,7 +46,7 @@ Run with '-h' for more information on parameters.
 
 #### results3d
 Shows the pdb structure in pymol, coloring residues with probability of being LIPs from Blue (not LIP) to Red (is LIP).
-Data for the visualization is taken from a result file, default is 'results.txt'
+Data for the visualization is taken from a result file that must be given.
 
 #### run
 This is the main command of the program. It takes parameters from a configuration file and performs desired actions.
@@ -95,7 +96,7 @@ The file looks like this:
 	],
 	"probability-blur": true,
 	"probability-blur-len": 6,
-	"result-file": "results.txt",
+	"result-folder": "results/",
 
 
 	"decision-tree": {
